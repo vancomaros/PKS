@@ -1,6 +1,7 @@
 from scapy.all import *
 
 file_number = 1
+list_IP = []
 
 
 def main(path):
@@ -8,6 +9,8 @@ def main(path):
     while 1:
         try:
             open_file_in_a_way_to_be_readable(path, file)
+            for i in list_IP:
+                file.write(i + "\n")
             file.close()
             exit()
         except FileNotFoundError:
@@ -60,24 +63,10 @@ def get_protocol(protocol):
             result = inner_list[1]
             prots.close()
             return str(result)
-    return "unidentified_protocol [" + protocol + "]"
+    return "unidentified protocol [" + protocol + "]"
 
 
 '''
-
-def open_protocols_file():
-    try:
-        ETHERTYPES = open(ETHERTYPES_FILE, 'r')
-    except FileNotFoundError:
-        print('Protocols not found.')
-        exit()
-    l = []
-    with open(ETHERTYPES_FILE) as f:
-        for line in f:
-            inner_list = [elt.strip() for elt in line.split(' ', maxsplit=1)]
-            l.append(inner_list)
-
-    return l
     switcher = {
         "2048": "Internet Protocol version 4 (IPv4)",
         "2054": "Address Resolution Protocol (ARP)",
@@ -95,6 +84,41 @@ def calculate_length(length):
     return length
 
 
+def nested(number, data):
+    prot = ""
+    if number == "2048":
+        prot = IPv4(data[23])
+    elif number == "2054":
+        prot = ARP()
+    elif number == "34525":
+        prot = IPv6()
+    return prot
+
+
+def ARP():
+    return "ARP"
+
+
+def IPv4(data):
+    return get_protocol(data)
+
+
+def IPv6():
+    return "IPv6"
+
+
+def save_IP(ip):
+    global list_IP
+    i = 0
+    while True:
+        if i >= len(list_IP):
+            list_IP.append(ip)
+            return
+        elif list_IP[i] == ip:
+            return
+        i += 1
+
+
 def tato_funkcia_zisti_aky_je_to_protokol(data):
     E_type = struct.unpack('! H', data[12:14])
     E_type = int(E_type[0])
@@ -102,10 +126,11 @@ def tato_funkcia_zisti_aky_je_to_protokol(data):
         return "Ethernet II\n"
     else:
         IE = struct.unpack('! H', data[14:16])
-        IEE = struct.unpack('! B', data[15:16])
+        # IEE = struct.unpack('! B', data[15:16])
         if int(IE[0]) == 65535:
             return "IEEE 802.3 – Raw\n"
-        elif int(IEE[0]) == 170:
+        # elif int(IEE[0]) == 170:
+        elif int(data[15]) == 170:
             return "IEEE 802.3 LLC + SNAP\n"
         else:
             return "IEEE 802.3 LLC\n"
@@ -124,7 +149,7 @@ def printing(data, src_mac, dest_mac, proto, vers, length, src_ip, dest_ip, file
     # file.write("Header Length = " + str(length) + "\n")
     file.write("Source IP = " + get_ip(hex_add(src_ip.hex())) + "\n")
     file.write("Destination IP = " + get_ip(hex_add(dest_ip.hex())) + "\n")
-    file.write("\n")
+    file.write(nested(str(proto), data) + "\n\n")
     file.write(hex_all("00" + data.hex()))
     file.write("\n")
     file.write("\n")
@@ -138,11 +163,8 @@ def collecting_data(data, file):
     src_addr, dest_addr = struct.unpack('! 4s 4s', data[26:34])
 
     printing(data, src_mac, dest_mac, protocol, h_version, h_length, src_addr, dest_addr, file)
-
-
-def get_mac_addr(bytes_addr):
-    bytes_str = map(format, bytes_addr)
-    return ':'.join(bytes_str).upper()
+    if str(protocol) == "2048":
+        save_IP(get_ip(hex_add(src_addr.hex())))     # heh
 
 
 def open_file_in_a_way_to_be_readable(path, output_file):
@@ -158,5 +180,5 @@ def open_file_in_a_way_to_be_readable(path, output_file):
 
 file_path = r"D:\vzorky_pcap_na_analyzu\\"
 final_file = r"eth-" + str(file_number) + ".pcap"
-# main(file_path+final_file)
-main(r"D:\vzorky_pcap_na_analyzu\trace-26.pcap")
+main(file_path+final_file)
+# main(r"D:\vzorky_pcap_na_analyzu\trace-26.pcap")
