@@ -1,7 +1,8 @@
 from scapy.all import *
 
-file_number = 1
+file_number = 5
 list_IP = []
+most_frequent_IP = []
 
 
 def main(path):
@@ -11,10 +12,13 @@ def main(path):
             open_file_in_a_way_to_be_readable(path, file)
             for i in list_IP:
                 file.write(i + "\n")
+            most = (most_frequent(most_frequent_IP))
+            file.write(most)
             file.close()
             exit()
         except FileNotFoundError:
             print('File not found.')
+            exit()
 
 
 def hex_add(data):
@@ -51,6 +55,23 @@ def get_ip(data):
         if i < len(data) - 4:
             ip_addr += "."
     return ip_addr
+
+
+def get_nested(data, protocol):
+    E_type = struct.unpack('! H', data[12:14])
+    E_type = int(E_type[0])
+    if E_type >= 1500:
+        f = open("E_proto.txt")
+    else:
+        f = open("802_proto.txt")
+
+    for lines in f:
+        inner_list = [elt.strip() for elt in lines.split(' ', maxsplit=1)]
+        if inner_list[0] == protocol:
+            result = inner_list[1]
+            f.close()
+            return str(result)
+    return "unidentified protocol [" + protocol + "]"
 
 
 def get_protocol(protocol):
@@ -109,6 +130,8 @@ def IPv6():
 
 def save_IP(ip):
     global list_IP
+    global most_frequent_IP
+    most_frequent_IP.append(ip)
     i = 0
     while True:
         if i >= len(list_IP):
@@ -117,6 +140,18 @@ def save_IP(ip):
         elif list_IP[i] == ip:
             return
         i += 1
+
+
+def most_frequent(List):
+    counter = 0
+    num = List[0]
+
+    for i in List:
+        frequency = List.count(i)
+        if frequency > counter:
+            counter = frequency
+            num = i
+    return "\n" + num + "   " + str(counter)
 
 
 def tato_funkcia_zisti_aky_je_to_protokol(data):
@@ -139,16 +174,16 @@ def tato_funkcia_zisti_aky_je_to_protokol(data):
 def printing(data, src_mac, dest_mac, proto, vers, length, src_ip, dest_ip, file):
     file.write("\nFrame Length pcap API " + str(len(data)) + "\n")
     leng = calculate_length(len(data))
-    file.write("Capture Length " + str(leng) + "\n")
+    file.write("Captured Length " + str(leng) + "\n")
     file.write(tato_funkcia_zisti_aky_je_to_protokol(data))
     file.write("Destination MAC: " + hex_add(dest_mac.hex()) + "\n")
     file.write("Source MAC: " + hex_add(src_mac.hex()) + "\n")
-    file.write("Protocol = " + get_protocol(proto) + "\n")
+    file.write("Protocol = " + get_nested(data, str(proto)) + "\n")
     # file.write("Protocol number = " + str(proto) + "\n")
     # file.write("Version = " + str(vers) + "\n")
     # file.write("Header Length = " + str(length) + "\n")
-    file.write("Source IP = " + get_ip(hex_add(src_ip.hex())) + "\n")
-    file.write("Destination IP = " + get_ip(hex_add(dest_ip.hex())) + "\n")
+    file.write("Source IP: " + get_ip(hex_add(src_ip.hex())) + "\n")
+    file.write("Destination IP: " + get_ip(hex_add(dest_ip.hex())) + "\n")
     file.write(nested(str(proto), data) + "\n\n")
     file.write(hex_all("00" + data.hex()))
     file.write("\n")
@@ -180,5 +215,5 @@ def open_file_in_a_way_to_be_readable(path, output_file):
 
 file_path = r"D:\vzorky_pcap_na_analyzu\\"
 final_file = r"eth-" + str(file_number) + ".pcap"
-main(file_path+final_file)
-# main(r"D:\vzorky_pcap_na_analyzu\trace-26.pcap")
+# main(file_path+final_file)
+main(r"D:\vzorky_pcap_na_analyzu\trace-22.pcap")
