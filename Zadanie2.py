@@ -57,21 +57,36 @@ def get_ip(data):
     return ip_addr
 
 
+def find_in_file(file, protocol):
+    protocol = str(protocol)
+    for lines in file:
+        inner_list = [elt.strip() for elt in lines.split(' ', maxsplit=1)]
+        print(lines[0], protocol)
+        if inner_list[0] == protocol:
+            result = inner_list[1]
+            file.close()
+            return str(result)
+    file.close()
+    return "unidentified protocol [" + protocol + "]"
+
+
 def get_nested(data, protocol):
     E_type = struct.unpack('! H', data[12:14])
     E_type = int(E_type[0])
-    if E_type >= 1500:
+    if tato_funkcia_zisti_aky_je_to_protokol(data) == "IEEE 802.3 LLC + SNAP\n":
         f = open("E_proto.txt")
-    else:
+        protocol = struct.unpack('! H', data[20:22])
+        protocol = int(protocol[0])
+    elif E_type >= 1500:
+        f = open("E_proto.txt")
+    elif tato_funkcia_zisti_aky_je_to_protokol(data) == "IEEE 802.3 LLC\n":
         f = open("802_proto.txt")
-
-    for lines in f:
-        inner_list = [elt.strip() for elt in lines.split(' ', maxsplit=1)]
-        if inner_list[0] == protocol:
-            result = inner_list[1]
-            f.close()
-            return str(result)
-    return "unidentified protocol [" + protocol + "]"
+        protocol = int(data[15])
+        protocol = str(protocol)
+        print(f, protocol)
+    else:
+        return ""
+    return "Protocol = " + find_in_file(f, protocol)
 
 
 def get_protocol(protocol):
@@ -82,19 +97,16 @@ def get_protocol(protocol):
         inner_list = [elt.strip() for elt in lines.split(' ', maxsplit=1)]
         if inner_list[0] == protocol:
             result = inner_list[1]
+            result = str(result)
             prots.close()
-            return str(result)
-    return "unidentified protocol [" + protocol + "]"
-
-
-'''
-    switcher = {
-        "2048": "Internet Protocol version 4 (IPv4)",
-        "2054": "Address Resolution Protocol (ARP)",
-        "0000": "IEEE 802.3 Lenght Field",
-    }
-    return switcher.get(protocol, "unidentified_protocol [" + protocol + "]")
-'''
+            switcher = {
+                "ICMP": ICMP(),
+                "TCP": TCP(),
+                "UDP": UDP(),
+            }
+            hue = switcher.get(result, "")
+            return result
+    return ""
 
 
 def calculate_length(length):
@@ -116,6 +128,12 @@ def nested(number, data):
     return prot
 
 
+def unpack(data, i, j, file):
+    d = struct.unpack('! H', data[i:j])
+    d = int(d[0])
+    find_in_file(file, d)
+
+
 def ARP():
     return "ARP"
 
@@ -126,6 +144,30 @@ def IPv4(data):
 
 def IPv6():
     return "IPv6"
+
+
+def ICMP():
+    return
+'''
+    prots = open("icmp_proto.txt")
+    protocol = str(protocol)
+
+    for lines in prots:
+        inner_list = [elt.strip() for elt in lines.split(' ', maxsplit=1)]
+        if inner_list[0] == protocol:
+            result = inner_list[1]
+            result = str(result)
+            prots.close()
+    return
+'''
+
+
+def TCP():
+    return
+
+
+def UDP():
+    return
 
 
 def save_IP(ip):
@@ -151,7 +193,7 @@ def most_frequent(List):
         if frequency > counter:
             counter = frequency
             num = i
-    return "\n" + num + "   " + str(counter)
+    return "\n" + num + "   " + str(counter) + " paketov"
 
 
 def tato_funkcia_zisti_aky_je_to_protokol(data):
@@ -178,13 +220,14 @@ def printing(data, src_mac, dest_mac, proto, vers, length, src_ip, dest_ip, file
     file.write(tato_funkcia_zisti_aky_je_to_protokol(data))
     file.write("Destination MAC: " + hex_add(dest_mac.hex()) + "\n")
     file.write("Source MAC: " + hex_add(src_mac.hex()) + "\n")
-    file.write("Protocol = " + get_nested(data, str(proto)) + "\n")
+    file.write(get_nested(data, str(proto)) + "\n")
     # file.write("Protocol number = " + str(proto) + "\n")
     # file.write("Version = " + str(vers) + "\n")
     # file.write("Header Length = " + str(length) + "\n")
-    file.write("Source IP: " + get_ip(hex_add(src_ip.hex())) + "\n")
-    file.write("Destination IP: " + get_ip(hex_add(dest_ip.hex())) + "\n")
-    file.write(nested(str(proto), data) + "\n\n")
+    if tato_funkcia_zisti_aky_je_to_protokol(data) == "Ethernet II\n":
+        file.write("Source IP: " + get_ip(hex_add(src_ip.hex())) + "\n")
+        file.write("Destination IP: " + get_ip(hex_add(dest_ip.hex())) + "\n")
+        file.write(nested(str(proto), data) + "\n")
     file.write(hex_all("00" + data.hex()))
     file.write("\n")
     file.write("\n")
@@ -216,4 +259,4 @@ def open_file_in_a_way_to_be_readable(path, output_file):
 file_path = r"D:\vzorky_pcap_na_analyzu\\"
 final_file = r"eth-" + str(file_number) + ".pcap"
 # main(file_path+final_file)
-main(r"D:\vzorky_pcap_na_analyzu\trace-22.pcap")
+main(r"D:\vzorky_pcap_na_analyzu\trace-25.pcap")

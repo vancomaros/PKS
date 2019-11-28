@@ -1,6 +1,3 @@
-2048 Internet Protocol version 4 (IPv4)
-2054 Address Resolution Protocol (ARP)
-0000 IEEE 802.3 Lenght Field
 1 ICMP
 2 IGMP
 6 TCP
