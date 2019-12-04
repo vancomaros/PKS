@@ -1,7 +1,7 @@
 2048 Internet IP (IPv4)
 2049 X.75 Internet
 2053 X.25 Level 3
-2054 Address Resolution Protocol (ARP)
+2054 ARP
 32821 Reverse ARP
 32923 Appletalk
 33011 AppleTalk AARP

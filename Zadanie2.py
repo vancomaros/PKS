@@ -5,6 +5,9 @@ list_IP = []
 most_frequent_IP = []
 filt = ""
 frame_num = 1
+tftp = ""
+check = 0
+com = 0
 
 
 def main():
@@ -24,6 +27,7 @@ def main():
                 file.write(i + "\n")
             most = (most_frequent(most_frequent_IP))
             file.write(most)
+            most_frequent_IP.clear()
             file.close()
             frame_num = 1
     except FileNotFoundError:
@@ -111,7 +115,7 @@ def get_protocol(protocol, leng, data, n):
                 "TCP": TCP(data, leng, n),
                 "UDP": TCP(data, leng, n),
             }
-            L24 = switcher.get(result, " ")
+            L4 = switcher.get(result, " ")
             if n == 0:
                 return str(L4)
             return result + str(L4)
@@ -131,7 +135,7 @@ def nested(number, data, n):
     if number == "2048":
         prot = IPv4(data[23], int(data[14]), data, n)
     elif number == "2054":
-        prot = ARP()
+        return "ARP"
     elif number == "34525":
         prot = IPv6()
     return prot
@@ -143,8 +147,15 @@ def unpack(data, i, j, file):
     find_in_file(file, d)
 
 
-def ARP():
-    return "ARP"
+def ARP(data):
+    global com
+    operation = struct.unpack('! H', data[20:22])
+    operation = int(operation[0])
+    if operation == 1:
+        operation = "Request"
+    else:
+        operation = "Reply"
+    return operation
 
 
 def IPv4(proto, leng, data, n):
@@ -176,34 +187,36 @@ def ICMP(data, leng, n):
     return ""
 
 
-'''
-    prots = open("icmp_proto.txt")
-    protocol = str(protocol)
-
-    for lines in prots:
-        inner_list = [elt.strip() for elt in lines.split(' ', maxsplit=1)]
-        if inner_list[0] == protocol:
-            result = inner_list[1]
-            result = str(result)
-            prots.close()
-    return
-'''
-
-
 def TCP(data, leng, n):
+    global tftp
+    global check
     source = struct.unpack('! H', data[14+leng:16+leng])
-    prots = open("protocols.txt")
     source = int(source[0])
     source = str(source)
     dest = struct.unpack('! H', data[16+leng:18+leng])
     dest = int(dest[0])
     dest = str(dest)
+    if source == tftp and check == 1:
+        if n == 1:
+            return " -> TFTP\n" + "Source port: " + source + "\n" + "Destination port: " + dest
+        return "TFTP"
+    if dest == tftp and check == 1:
+        if n == 1:
+            return " -> TFTP\n" + "Source port: " + source + "\n" + "Destination port: " + dest
+        return "TFTP"
+    prots = open("protocols.txt")
     for lines in prots:
         inner_list = [elt.strip() for elt in lines.split(' ', maxsplit=1)]
         if inner_list[0] == source:
             result = inner_list[1]
             result = str(result)
             prots.close()
+            if result == "tftp":
+                check = 1
+            if check == 1:
+                tftp = dest
+                if int(tftp) < 1024:
+                    tftp = ""
             if n == 1:
                 return " -> " + result.upper() + "\n" + "Source port: " + source + "\n" + "Destination port: " + dest
             else:
@@ -216,6 +229,12 @@ def TCP(data, leng, n):
             result = inner_list[1]
             result = str(result)
             protz.close()
+            if result == "tftp":
+                check = 1
+            if check == 1:
+                tftp = source
+                if int(tftp) < 1024:
+                    tftp = ""
             if n == 1:
                 return " -> " + result.upper() + "\n" + "Source port: " + source + "\n" + "Destination port: " + dest
             else:
@@ -276,6 +295,8 @@ def printing(data, src_mac, dest_mac, proto, src_ip, dest_ip, file):
     file.write("Destination MAC: " + hex_add(dest_mac.hex()) + "\n")
     file.write("Source MAC: " + hex_add(src_mac.hex()) + "\n")
     file.write(get_nested(data, str(proto)) + "\n")
+    if get_nested(data, str(proto)) == "Protocol = ARP":
+        file.write(ARP(data) + "\n")
     if get_nested(data, str(proto)) == "Protocol = Internet IP (IPv4)":
         file.write("Source IP: " + get_ip(hex_add(src_ip.hex())) + "\n")
         file.write("Destination IP: " + get_ip(hex_add(dest_ip.hex())) + "\n")

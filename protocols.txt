@@ -12,7 +12,7 @@
 115 L2TP
 7 echo
 19 chargen
-20 ftpp-data
+20 ftp-data
 21 ftp-control
 22 ssh
 23 telnet
