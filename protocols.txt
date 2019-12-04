@@ -30,3 +30,14 @@
 443 https
 445 microsoft-de
 1080 socks
+67 bootps (DHCP)
+68 bootpc (DHCP)
+69 tftp
+137 netbios-ns
+138 netbios-dgm
+161 snmp
+162 snmp-trap
+500 isakmp
+514 syslog
+520 rip
+33434 traceroute

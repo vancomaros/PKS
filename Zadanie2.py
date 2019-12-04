@@ -3,22 +3,31 @@ from scapy.all import *
 file_number = 5
 list_IP = []
 most_frequent_IP = []
+filt = ""
+frame_num = 1
 
 
-def main(path):
-    file = open("output.txt", "w+")
-    while 1:
-        try:
+def main():
+    global filt
+    global frame_num
+    file_path = r"D:\vzorky_pcap_na_analyzu\\"
+    final_file = input("Meno suboru: ")
+    path = file_path + final_file
+    try:
+        while 1:
+            filt = input("Filter: ")
+            if filt == "exit":
+                exit()
+            file = open("output.txt", "w+")
             open_file_in_a_way_to_be_readable(path, file)
             for i in list_IP:
                 file.write(i + "\n")
             most = (most_frequent(most_frequent_IP))
             file.write(most)
             file.close()
-            exit()
-        except FileNotFoundError:
-            print('File not found.')
-            exit()
+            frame_num = 1
+    except FileNotFoundError:
+        print('File not found.')
 
 
 def hex_add(data):
@@ -61,7 +70,6 @@ def find_in_file(file, protocol):
     protocol = str(protocol)
     for lines in file:
         inner_list = [elt.strip() for elt in lines.split(' ', maxsplit=1)]
-        print(lines[0], protocol)
         if inner_list[0] == protocol:
             result = inner_list[1]
             file.close()
@@ -83,13 +91,12 @@ def get_nested(data, protocol):
         f = open("802_proto.txt")
         protocol = int(data[15])
         protocol = str(protocol)
-        print(f, protocol)
     else:
         return ""
     return "Protocol = " + find_in_file(f, protocol)
 
 
-def get_protocol(protocol):
+def get_protocol(protocol, leng, data, n):
     prots = open("protocols.txt")
     protocol = str(protocol)
 
@@ -100,12 +107,14 @@ def get_protocol(protocol):
             result = str(result)
             prots.close()
             switcher = {
-                "ICMP": ICMP(),
-                "TCP": TCP(),
-                "UDP": UDP(),
+                "ICMP": ICMP(data, leng, n),
+                "TCP": TCP(data, leng, n),
+                "UDP": TCP(data, leng, n),
             }
-            hue = switcher.get(result, "")
-            return result
+            L24 = switcher.get(result, " ")
+            if n == 0:
+                return str(L4)
+            return result + str(L4)
     return ""
 
 
@@ -117,10 +126,10 @@ def calculate_length(length):
     return length
 
 
-def nested(number, data):
+def nested(number, data, n):
     prot = ""
     if number == "2048":
-        prot = IPv4(data[23])
+        prot = IPv4(data[23], int(data[14]), data, n)
     elif number == "2054":
         prot = ARP()
     elif number == "34525":
@@ -138,16 +147,35 @@ def ARP():
     return "ARP"
 
 
-def IPv4(data):
-    return get_protocol(data)
+def IPv4(proto, leng, data, n):
+    leng = (leng & 15) * 4  # dalsie 4 su dlzka
+    return get_protocol(proto, leng, data, n)
 
 
 def IPv6():
     return "IPv6"
 
 
-def ICMP():
-    return
+def ICMP(data, leng, n):
+    if n == 0:
+        return "ICMP"
+    prots = open("icmp_proto.txt")
+    typ = int(data[14+leng])
+    typ = str(typ)
+    for lines in prots:
+        inner_list = [elt.strip() for elt in lines.split(' ', maxsplit=1)]
+        if inner_list[0] == typ:
+            result = inner_list[1]
+            result = str(result)
+            prots.close()
+            if n == 1:
+                return " -> " + result.upper()
+            else:
+                return result.upper()
+    prots.close()
+    return ""
+
+
 '''
     prots = open("icmp_proto.txt")
     protocol = str(protocol)
@@ -162,12 +190,38 @@ def ICMP():
 '''
 
 
-def TCP():
-    return
-
-
-def UDP():
-    return
+def TCP(data, leng, n):
+    source = struct.unpack('! H', data[14+leng:16+leng])
+    prots = open("protocols.txt")
+    source = int(source[0])
+    source = str(source)
+    dest = struct.unpack('! H', data[16+leng:18+leng])
+    dest = int(dest[0])
+    dest = str(dest)
+    for lines in prots:
+        inner_list = [elt.strip() for elt in lines.split(' ', maxsplit=1)]
+        if inner_list[0] == source:
+            result = inner_list[1]
+            result = str(result)
+            prots.close()
+            if n == 1:
+                return " -> " + result.upper() + "\n" + "Source port: " + source + "\n" + "Destination port: " + dest
+            else:
+                return result
+    prots.close()
+    protz = open("protocols.txt")
+    for line in protz:
+        inner_list = [elt.strip() for elt in line.split(' ', maxsplit=1)]
+        if inner_list[0] == dest:
+            result = inner_list[1]
+            result = str(result)
+            protz.close()
+            if n == 1:
+                return " -> " + result.upper() + "\n" + "Source port: " + source + "\n" + "Destination port: " + dest
+            else:
+                return result
+    protz.close()
+    return ""
 
 
 def save_IP(ip):
@@ -213,7 +267,8 @@ def tato_funkcia_zisti_aky_je_to_protokol(data):
             return "IEEE 802.3 LLC\n"
 
 
-def printing(data, src_mac, dest_mac, proto, vers, length, src_ip, dest_ip, file):
+def printing(data, src_mac, dest_mac, proto, src_ip, dest_ip, file):
+    file.write("Frame " + str(frame_num))
     file.write("\nFrame Length pcap API " + str(len(data)) + "\n")
     leng = calculate_length(len(data))
     file.write("Captured Length " + str(leng) + "\n")
@@ -221,26 +276,23 @@ def printing(data, src_mac, dest_mac, proto, vers, length, src_ip, dest_ip, file
     file.write("Destination MAC: " + hex_add(dest_mac.hex()) + "\n")
     file.write("Source MAC: " + hex_add(src_mac.hex()) + "\n")
     file.write(get_nested(data, str(proto)) + "\n")
-    # file.write("Protocol number = " + str(proto) + "\n")
-    # file.write("Version = " + str(vers) + "\n")
-    # file.write("Header Length = " + str(length) + "\n")
-    if tato_funkcia_zisti_aky_je_to_protokol(data) == "Ethernet II\n":
+    if get_nested(data, str(proto)) == "Protocol = Internet IP (IPv4)":
         file.write("Source IP: " + get_ip(hex_add(src_ip.hex())) + "\n")
         file.write("Destination IP: " + get_ip(hex_add(dest_ip.hex())) + "\n")
-        file.write(nested(str(proto), data) + "\n")
+        file.write(nested(str(proto), data, 1) + "\n")
     file.write(hex_all("00" + data.hex()))
-    file.write("\n")
-    file.write("\n")
+    file.write("\n\n\n")
 
 
 def collecting_data(data, file):
+    global frame_num
     dest_mac, src_mac, protocol = struct.unpack('! 6s 6s H', data[:14])
-    header = data[14]
-    h_version = header >> 4  # prve 4 bity su verzia
-    h_length = (header & 15) * 4  # dalsie 4 su dlzka
     src_addr, dest_addr = struct.unpack('! 4s 4s', data[26:34])
-
-    printing(data, src_mac, dest_mac, protocol, h_version, h_length, src_addr, dest_addr, file)
+    if filt == '':
+        printing(data, src_mac, dest_mac, protocol, src_addr, dest_addr, file)
+    elif filt.upper() == nested(str(protocol), data, 0).upper():
+        printing(data, src_mac, dest_mac, protocol, src_addr, dest_addr, file)
+    frame_num += 1
     if str(protocol) == "2048":
         save_IP(get_ip(hex_add(src_addr.hex())))     # heh
 
@@ -249,14 +301,9 @@ def open_file_in_a_way_to_be_readable(path, output_file):
     file = rdpcap(path)
     i = 1
     for frames in file:
-        output_file.write("Frame " + str(i))
         i += 1
         collecting_data(raw(frames), output_file)
-        output_file.write("\n")
     return
 
 
-file_path = r"D:\vzorky_pcap_na_analyzu\\"
-final_file = r"eth-" + str(file_number) + ".pcap"
-# main(file_path+final_file)
-main(r"D:\vzorky_pcap_na_analyzu\trace-25.pcap")
+main()
